@@ -1,7 +1,7 @@
 package com.ecommerce.project.controller;
 
 import com.ecommerce.project.model.AppRole;
-import com.ecommerce.project.model.Roles;
+import com.ecommerce.project.model.Role;
 import com.ecommerce.project.model.User;
 import com.ecommerce.project.repositiries.RoleRepository;
 import com.ecommerce.project.repositiries.UserRepository;
@@ -94,29 +94,29 @@ public class AuthController {
                 encoder.encode(signUpRequest.getPassword()));
 
         Set<String> strRoles = signUpRequest.getRole();
-        Set<Roles> roles = new HashSet<>();
+        Set<Role> roles = new HashSet<>();
 
         if (strRoles == null) {
-            Roles userRole = roleRepository.findByRoleName(AppRole.ROLE_USER)
+            Role userRole = roleRepository.findByRoleName(AppRole.ROLE_USER)
                     .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
             roles.add(userRole);
         } else {
             strRoles.forEach(role -> {
                 switch (role) {
                     case "admin":
-                        Roles adminRole = roleRepository.findByRoleName(AppRole.ROLE_ADMIN)
+                        Role adminRole = roleRepository.findByRoleName(AppRole.ROLE_ADMIN)
                                 .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
                         roles.add(adminRole);
 
                         break;
                     case "seller":
-                        Roles modRole = roleRepository.findByRoleName(AppRole.ROLE_SELLER)
+                        Role modRole = roleRepository.findByRoleName(AppRole.ROLE_SELLER)
                                 .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
                         roles.add(modRole);
 
                         break;
                     default:
-                        Roles userRole = roleRepository.findByRoleName(AppRole.ROLE_USER)
+                        Role userRole = roleRepository.findByRoleName(AppRole.ROLE_USER)
                                 .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
                         roles.add(userRole);
                 }
@@ -131,17 +131,17 @@ public class AuthController {
 
     @GetMapping("/username")
     public String currentUserName(Authentication authentication){
-        if (authentication != null)
+        if(authentication !=null){
             return authentication.getName();
-        else
-            return "";
+
+        }
+        else{
+            return " ";
+        }
     }
-
-
     @GetMapping("/user")
     public ResponseEntity<?> getUserDetails(Authentication authentication){
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
+        UserDetailsImpl userDetails= (UserDetailsImpl) authentication.getPrincipal();
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
@@ -150,14 +150,14 @@ public class AuthController {
                 userDetails.getUsername(), roles);
 
         return ResponseEntity.ok().body(response);
-    }
 
+    }
     @PostMapping("/signout")
-    public ResponseEntity<?> signoutUser(){
-        ResponseCookie cookie = jwtUtils.getCleanJwtCookie();
+
+    public ResponseEntity<?>signoutUser(){
+        ResponseCookie cookie=jwtUtils.gentCleanJwtCookie();
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE,
                         cookie.toString())
-                .build();
-
+                .body(new MessageResponse("You are been signed out !"));
     }
 }

@@ -36,9 +36,6 @@ public class Address {
     @Size(min=5,message = "city name should be atleast 5 characters")
     private String city;
 
-    @NotBlank
-    @Size(min=5,message = "Street name should be atleast 5 characters")
-    private String Street;
 
     @NotBlank
     @Size(min=5,message = "Country name should be atleast 5 characters")
@@ -52,13 +49,13 @@ public class Address {
     @ManyToMany(mappedBy = "addresses")
     private List<User>users=new ArrayList<>();
 
-    public Address(String buildingName, String city, String country, String pincode, String street, String street1) {
+    public Address(String buildingName, String city, String country, String pincode, String street ) {
         this.buildingName = buildingName;
         this.city = city;
         this.country = country;
         this.pincode = pincode;
         this.street = street;
-        Street = street1;
+
     }
 }
 

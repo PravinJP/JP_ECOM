@@ -1,7 +1,7 @@
 package com.ecommerce.project.security;
 
 import com.ecommerce.project.model.AppRole;
-import com.ecommerce.project.model.Roles;
+import com.ecommerce.project.model.Role;
 import com.ecommerce.project.model.User;
 import com.ecommerce.project.repositiries.RoleRepository;
 import com.ecommerce.project.repositiries.UserRepository;
@@ -81,7 +81,7 @@ public class WebSecurityConfig {
                                 .requestMatchers("/v3/api-docs/**").permitAll()
                                 .requestMatchers("/h2-console/**").permitAll()
                                 //.requestMatchers("/api/admin/**").permitAll()
-                                .requestMatchers("/api/public/**").permitAll()
+                                //.requestMatchers("/api/public/**").permitAll()
                                 .requestMatchers("/swagger-ui/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
                                 .requestMatchers("/images/**").permitAll()
@@ -112,27 +112,27 @@ public class WebSecurityConfig {
     public CommandLineRunner initData(RoleRepository roleRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
             // Retrieve or create roles
-            Roles userRole = roleRepository.findByRoleName(AppRole.ROLE_USER)
+            Role userRole = roleRepository.findByRoleName(AppRole.ROLE_USER)
                     .orElseGet(() -> {
-                        Roles newUserRole = new Roles(AppRole.ROLE_USER);
+                        Role newUserRole = new Role(AppRole.ROLE_USER);
                         return roleRepository.save(newUserRole);
                     });
 
-            Roles sellerRole = roleRepository.findByRoleName(AppRole.ROLE_SELLER)
+            Role sellerRole = roleRepository.findByRoleName(AppRole.ROLE_SELLER)
                     .orElseGet(() -> {
-                        Roles newSellerRole = new Roles(AppRole.ROLE_SELLER);
+                        Role newSellerRole = new Role(AppRole.ROLE_SELLER);
                         return roleRepository.save(newSellerRole);
                     });
 
-            Roles adminRole = roleRepository.findByRoleName(AppRole.ROLE_ADMIN)
+            Role adminRole = roleRepository.findByRoleName(AppRole.ROLE_ADMIN)
                     .orElseGet(() -> {
-                        Roles newAdminRole = new Roles(AppRole.ROLE_ADMIN);
+                        Role newAdminRole = new Role(AppRole.ROLE_ADMIN);
                         return roleRepository.save(newAdminRole);
                     });
 
-            Set<Roles> userRoles = Set.of(userRole);
-            Set<Roles> sellerRoles = Set.of(sellerRole);
-            Set<Roles> adminRoles = Set.of(userRole, sellerRole, adminRole);
+            Set<Role> userRoles = Set.of(userRole);
+            Set<Role> sellerRoles = Set.of(sellerRole);
+            Set<Role> adminRoles = Set.of(userRole, sellerRole, adminRole);
 
 
             // Create users if not already present
