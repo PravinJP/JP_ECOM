@@ -10,13 +10,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.WebUtils;
 
 import javax.crypto.SecretKey;
 import java.security.Key;
-import java.util.Date;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtUtils {
@@ -33,33 +34,43 @@ public class JwtUtils {
 
     public String getJwtFromCookies(HttpServletRequest request) {
         Cookie cookie = WebUtils.getCookie(request, jwtCookie);
-        if (cookie != null) {
-            return cookie.getValue();
-        } else {
-            return null;
-        }
+        return cookie != null ? cookie.getValue() : null;
     }
 
+    public String getJwtFromHeader(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+
+    // ✅ Generate token with roles included
     public ResponseCookie generateJwtCookie(UserDetailsImpl userPrincipal) {
-        String jwt = generateTokenFromUsername(userPrincipal.getUsername());
-        ResponseCookie cookie = ResponseCookie.from(jwtCookie, jwt)
+        String jwt = generateToken(userPrincipal);
+        return ResponseCookie.from(jwtCookie, jwt)
                 .path("/api")
                 .maxAge(24 * 60 * 60)
                 .httpOnly(false)
+                .secure(false)
                 .build();
-        return cookie;
-    }
-    public ResponseCookie gentCleanJwtCookie() {
-
-        ResponseCookie cookie = ResponseCookie.from(jwtCookie, null)
-                .path("/api")
-                .build();
-        return cookie;
     }
 
-    public String generateTokenFromUsername(String username) {
+    public ResponseCookie getCleanJwtCookie() {
+        return ResponseCookie.from(jwtCookie, null).path("/api").build();
+    }
+
+    // ✅ Token now contains both username & roles
+    public String generateToken(UserDetailsImpl userPrincipal) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("roles", userPrincipal.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList()));
+
         return Jwts.builder()
-                .subject(username)
+                .subject(userPrincipal.getUsername())
+                .claims(claims)
                 .issuedAt(new Date())
                 .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(key())
@@ -69,8 +80,21 @@ public class JwtUtils {
     public String getUserNameFromJwtToken(String token) {
         return Jwts.parser()
                 .verifyWith((SecretKey) key())
-                .build().parseSignedClaims(token)
-                .getPayload().getSubject();
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    // ✅ Extract roles from JWT
+    public List<String> getRolesFromJwtToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith((SecretKey) key())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("roles", List.class);
     }
 
     private Key key() {
@@ -79,7 +103,6 @@ public class JwtUtils {
 
     public boolean validateJwtToken(String authToken) {
         try {
-            System.out.println("Validate");
             Jwts.parser().verifyWith((SecretKey) key()).build().parseSignedClaims(authToken);
             return true;
         } catch (MalformedJwtException e) {

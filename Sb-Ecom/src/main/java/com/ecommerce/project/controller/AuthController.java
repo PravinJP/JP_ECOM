@@ -3,8 +3,8 @@ package com.ecommerce.project.controller;
 import com.ecommerce.project.model.AppRole;
 import com.ecommerce.project.model.Role;
 import com.ecommerce.project.model.User;
-import com.ecommerce.project.repositiries.RoleRepository;
-import com.ecommerce.project.repositiries.UserRepository;
+import com.ecommerce.project.repositories.RoleRepository;
+import com.ecommerce.project.repositories.UserRepository;
 import com.ecommerce.project.security.jwt.JwtUtils;
 import com.ecommerce.project.security.request.LoginRequest;
 import com.ecommerce.project.security.request.SignUpRequest;
@@ -131,17 +131,17 @@ public class AuthController {
 
     @GetMapping("/username")
     public String currentUserName(Authentication authentication){
-        if(authentication !=null){
+        if (authentication != null)
             return authentication.getName();
-
-        }
-        else{
-            return " ";
-        }
+        else
+            return "";
     }
+
+
     @GetMapping("/user")
     public ResponseEntity<?> getUserDetails(Authentication authentication){
-        UserDetailsImpl userDetails= (UserDetailsImpl) authentication.getPrincipal();
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
@@ -150,14 +150,13 @@ public class AuthController {
                 userDetails.getUsername(), roles);
 
         return ResponseEntity.ok().body(response);
-
     }
-    @PostMapping("/signout")
 
-    public ResponseEntity<?>signoutUser(){
-        ResponseCookie cookie=jwtUtils.gentCleanJwtCookie();
+    @PostMapping("/signout")
+    public ResponseEntity<?> signoutUser(){
+        ResponseCookie cookie = jwtUtils.getCleanJwtCookie();
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE,
                         cookie.toString())
-                .body(new MessageResponse("You are been signed out !"));
+                .body(new MessageResponse("You've been signed out!"));
     }
 }

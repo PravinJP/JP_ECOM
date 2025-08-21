@@ -3,12 +3,14 @@ package com.ecommerce.project.security;
 import com.ecommerce.project.model.AppRole;
 import com.ecommerce.project.model.Role;
 import com.ecommerce.project.model.User;
-import com.ecommerce.project.repositiries.RoleRepository;
-import com.ecommerce.project.repositiries.UserRepository;
+import com.ecommerce.project.repositories.RoleRepository;
+import com.ecommerce.project.repositories.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 //import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -29,13 +31,18 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import com.ecommerce.project.security.jwt.AuthEntryPointJwt;
 import com.ecommerce.project.security.jwt.AuthTokenFilter;
 import com.ecommerce.project.security.services.UserDetailsServiceImpl;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.List;
 import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
-//@EnableMethodSecurity
+@EnableMethodSecurity   // ✅ enable method-level security
 public class WebSecurityConfig {
+
     @Autowired
     UserDetailsServiceImpl userDetailsService;
 
@@ -43,130 +50,67 @@ public class WebSecurityConfig {
     private AuthEntryPointJwt unauthorizedHandler;
 
     @Bean
-    public AuthTokenFilter authenticationJwtTokenFilter() {
-        return new AuthTokenFilter();
-    }
-
-
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-
-        return authProvider;
-    }
-
-
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-
-
-    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/api/auth/**").permitAll()
-                                .requestMatchers("/v3/api-docs/**").permitAll()
-                                .requestMatchers("/h2-console/**").permitAll()
-                                //.requestMatchers("/api/admin/**").permitAll()
-                                //.requestMatchers("/api/public/**").permitAll()
-                                .requestMatchers("/swagger-ui/**").permitAll()
-                                .requestMatchers("/api/test/**").permitAll()
-                                .requestMatchers("/images/**").permitAll()
-                                .anyRequest().authenticated()
-                );
-
-        http.authenticationProvider(authenticationProvider());
-
-        http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
-        http.headers(headers -> headers.frameOptions(
-                frameOptions -> frameOptions.sameOrigin()));
-
-        return http.build();
+        // Enable CORS and disable CSRF
+        // Set session management to stateless
+        return http// Enable CORS with default settings
+                .sessionManagement(
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(
+                        exception ->
+                                exception.authenticationEntryPoint(
+                                        (request, response, ex) ->
+                                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage())))
+                .authorizeHttpRequests(
+                        authorize ->
+                                authorize
+                                        .requestMatchers("/**")
+                                        .permitAll()
+                                        .requestMatchers("/swagger-ui.html")
+                                        .permitAll()
+                                        .requestMatchers("/swagger-resources/**")
+                                        .permitAll()
+                                        .requestMatchers("/swagger-ui/**")
+                                        .permitAll()
+                                        .requestMatchers("/v3/api-docs")
+                                        .permitAll()
+                                        .requestMatchers("/v3/api-docs/**")
+                                        .permitAll()
+                                        .requestMatchers("/swagger-resources/**")
+                                        .permitAll()
+                                        .requestMatchers("/configuration/ui")
+                                        .permitAll()
+                                        .requestMatchers("/webjars/**")
+                                        .permitAll()
+                                        .requestMatchers("/management/**")
+                                        .permitAll()
+                                        .requestMatchers("/v1/ping")
+                                        .permitAll()
+                                        .requestMatchers(
+                                                "/v1/api/migration/**",
+                                                "/v1/api/migration/apply-changelog",
+                                                "/v1/api/migration/initialize-schema/**",
+                                                "/v1/api/migration/load-master-org-data")
+                                        .permitAll()
+                                        .anyRequest()
+                                        .authenticated())
+                .addFilterBefore(perRequestJwtValidationFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
     }
 
+
+    // Used by Spring Security if CORS is enabled.
     @Bean
-    public WebSecurityCustomizer webSecurityCustomizer() {
-        return (web -> web.ignoring().requestMatchers("/v2/api-docs",
-                "/configuration/ui",
-                "/swagger-resources/**",
-                "/configuration/security",
-                "/swagger-ui.html",
-                "/webjars/**"));
+    protected CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("*"));
+        configuration.setAllowedMethods(List.of("*"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(
+                List.of("Authorization")); // Add if you expose any custom headers
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
-
-
-    @Bean
-    public CommandLineRunner initData(RoleRepository roleRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        return args -> {
-            // Retrieve or create roles
-            Role userRole = roleRepository.findByRoleName(AppRole.ROLE_USER)
-                    .orElseGet(() -> {
-                        Role newUserRole = new Role(AppRole.ROLE_USER);
-                        return roleRepository.save(newUserRole);
-                    });
-
-            Role sellerRole = roleRepository.findByRoleName(AppRole.ROLE_SELLER)
-                    .orElseGet(() -> {
-                        Role newSellerRole = new Role(AppRole.ROLE_SELLER);
-                        return roleRepository.save(newSellerRole);
-                    });
-
-            Role adminRole = roleRepository.findByRoleName(AppRole.ROLE_ADMIN)
-                    .orElseGet(() -> {
-                        Role newAdminRole = new Role(AppRole.ROLE_ADMIN);
-                        return roleRepository.save(newAdminRole);
-                    });
-
-            Set<Role> userRoles = Set.of(userRole);
-            Set<Role> sellerRoles = Set.of(sellerRole);
-            Set<Role> adminRoles = Set.of(userRole, sellerRole, adminRole);
-
-
-            // Create users if not already present
-            if (!userRepository.existsByUserName("user1")) {
-                User user1 = new User("user1", "user1@example.com", passwordEncoder.encode("password1"));
-                userRepository.save(user1);
-            }
-
-            if (!userRepository.existsByUserName("seller1")) {
-                User seller1 = new User("seller1", "seller1@example.com", passwordEncoder.encode("password2"));
-                userRepository.save(seller1);
-            }
-
-            if (!userRepository.existsByUserName("admin")) {
-                User admin = new User("admin", "admin@example.com", passwordEncoder.encode("adminPass"));
-                userRepository.save(admin);
-            }
-
-            // Update roles for existing users
-            userRepository.findByUserName("user1").ifPresent(user -> {
-                user.setRoles(userRoles);
-                userRepository.save(user);
-            });
-
-            userRepository.findByUserName("seller1").ifPresent(seller -> {
-                seller.setRoles(sellerRoles);
-                userRepository.save(seller);
-            });
-
-            userRepository.findByUserName("admin").ifPresent(admin -> {
-                admin.setRoles(adminRoles);
-                userRepository.save(admin);
-            });
-        };
-    }
-
 }
+

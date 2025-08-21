@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -16,6 +18,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class AuthTokenFilter extends OncePerRequestFilter {
@@ -36,13 +40,19 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
 
+                // ✅ Extract roles directly from JWT
+                List<String> roles = jwtUtils.getRolesFromJwtToken(jwt);
+                List<GrantedAuthority> authorities = roles.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
+                // ✅ Inject JWT roles into Authentication
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails,
-                                null,
-                                userDetails.getAuthorities());
-                logger.debug("Roles from JWT: {}", userDetails.getAuthorities());
+                        new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
+
+                logger.debug("Roles from JWT: {}", authorities);
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
@@ -56,9 +66,18 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     }
 
     private String parseJwt(HttpServletRequest request) {
-        String jwt = jwtUtils.getJwtFromCookies(request);
-        logger.debug("AuthTokenFilter.java: {}", jwt);
-        return jwt;
+        // 1. Always prefer Authorization header
+        String jwtFromHeader = jwtUtils.getJwtFromHeader(request);
+        if (jwtFromHeader != null) {
+            return jwtFromHeader;
+        }
+
+        // 2. Fallback to cookie (browser-based clients)
+        String jwtFromCookie = jwtUtils.getJwtFromCookies(request);
+        if (jwtFromCookie != null) {
+            return jwtFromCookie;
+        }
+
+        return null;
     }
 }
-
